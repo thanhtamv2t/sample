@@ -1,0 +1,152 @@
+'use client';
+import React from 'react'
+
+
+import factory from '@/contracts/Factory.json';
+import CustomERC721 from '@/contracts/CustomERC721.json';
+import { ethers } from 'ethers'
+import { useGetSetState } from 'react-use';
+
+
+const factoryAddress = "0x822B117EFa95A606Abc7e82acd66220E1102503b";
+
+const provider = new ethers.JsonRpcProvider("https://sepolia.infura.io/v3/703c33e04a1649088ed0537ef0965779")
+const wallet = new ethers.Wallet("046b0f39761b1667b4e29940c00eeb776358042a10354b5fe7a837a38083f2dd", provider)
+
+const contract = new ethers.Contract(factoryAddress, factory.abi, wallet)
+
+
+
+const insertStorage = (a: any) => {
+    const current = localStorage.getItem('test') || '[]'
+    const data = JSON.parse(current)
+    data.push(a)
+    localStorage.setItem('test', JSON.stringify(data))
+}
+
+const getStorage = () => {
+    return JSON.parse(localStorage.getItem('test') || '[]')
+}   
+
+const Test = () => {
+
+    
+    const [storage, setStorage] = React.useState(() => getStorage())
+    const [isLoading, setIsLoading] = React.useState(false)
+    const [get, setState] = useGetSetState({
+        catName: '',
+        catSym: '',
+        address: '',
+        tokenId: '',
+        contract: ''
+    })
+
+
+    const onChangeValue = (e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLSelectElement>) => {
+        console.log(`🐳 -> onChangeValue -> e:`, e.target.value)
+        const { name, value } = e.target
+        setState({ [name]: value })
+    }
+
+    const onCreateContract = async () => {
+        if (!get().catName || !get().catSym) {
+            return
+        }
+
+        setIsLoading(true)
+
+        const tx = await contract.createERC721(get().catName, get().catSym, "https://google.com");
+        console.log(`🐳 -> tx -> tx:`, tx)
+
+        const receipt = await tx.wait()
+        
+        const findAddress = receipt.logs.find(e => e.eventName === "ERC721Created");
+
+        insertStorage(findAddress?.args)
+        
+        setStorage(getStorage())
+
+        console.log(receipt)
+        setIsLoading(false)
+
+        alert('Tạo contract thành công')
+    }
+
+    const onCreateNFT = async () => {
+        if (!get().contract || !get().address || !get().tokenId) {
+            console.log(get())
+            return
+        }
+
+        setIsLoading(true)
+
+        const _contract = new ethers.Contract(get().contract, CustomERC721.abi, wallet)
+        const tx = await _contract.mintById(get().address, 'https://google.com', get().tokenId);
+        console.log(`🐳 -> tx -> tx:`, tx)
+
+        const receipt = await tx.wait()
+        
+        console.log(receipt)
+        setIsLoading(false)
+
+        alert('Tạo NFT thành công')
+    }
+
+
+    return (
+        <div className='flex gap-4 w-1/2 mx-auto'>
+            <div className='flex-1'>
+                <div>
+                    <div>
+                        Tên collection
+                    </div>
+                    <input type="text" placeholder='Tên danh mục' name="catName" onChange={onChangeValue} />
+                </div>
+                <div>
+                    <div>
+                        Symbol
+                    </div>
+                    <input type="text" placeholder='Symbol' name="catSym" onChange={onChangeValue} />
+                </div>
+                <button onClick={onCreateContract} disabled={isLoading} className='btn'>
+                    {isLoading ? 'Loading...' : 'Tạo categories contract'}
+                </button>
+            </div>
+
+            <div className='flex-1'>
+                <div>
+                    <select onChange={onChangeValue} name="contract">
+                        {
+                            storage.map((e: any) => {
+                                const [contract, name, symbol] = e;
+                                return (
+                                    <option value={contract}>
+                                        {name} - {symbol}
+                                    </option>
+                                )
+                            })
+                        }
+                    </select>
+                </div>
+                <div>
+                    
+                    <div>
+                        ID
+                    </div>
+                    <input type="text" placeholder='name' name="tokenId" onChange={onChangeValue} />
+                </div>
+                <div>
+                    <div>
+                        Địa chỉ cần issue
+                    </div>
+                    <input type="text" placeholder='name' name="address" onChange={onChangeValue} />
+                </div>
+                <button className='btn' disabled={isLoading} onClick={onCreateNFT}>
+                    {isLoading ? 'Loading...' : 'Tạo NFT cho user'}
+                </button>
+            </div>
+        </div>
+    )
+}
+
+export default Test
